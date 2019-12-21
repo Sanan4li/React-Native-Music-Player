@@ -1,16 +1,17 @@
 import React, { Component } from 'react'
-import {View, Text , StyleSheet, Dimensions, Image , TouchableOpacity, FlatList} from "react-native";
+import {View, Text , StyleSheet, Dimensions, Image , TouchableWithoutFeedback , FlatList} from "react-native";
 import TrackPlayer from 'react-native-track-player';
 import MusicFiles from 'react-native-get-music-files';
 import FontAwesome from "react-native-vector-icons/FontAwesome";
 import FontAwesome5 from "react-native-vector-icons/FontAwesome5";
 import Feather from "react-native-vector-icons/Feather";
-import ProgressBarAnimated from 'react-native-progress-bar-animated';
+import {request, PERMISSIONS} from 'react-native-permissions';
  class SongsListScreen extends Component {
      state = {
          songs : null,
          songsAdded: [],
-         currentSong : {
+         storagePermission:null,
+         currentSong : {  
             id : 1,
             url : "",
             title : "No Song To Play",
@@ -18,42 +19,69 @@ import ProgressBarAnimated from 'react-native-progress-bar-animated';
             album : "No Album",
             genre : "No Genre"
          },
-         progress: 10,
-         progressWithOnComplete: 0,
-         progressCustomized: 0,
+        
          playingIcon : "play",
          songPlayed : "no",
 
      }
-     increase = (key, value) => {
+     
+     playNextSong = (currentSong)=>{
+      let index = this.state.songs.findIndex(
+          (i)=>{
+            return i == currentSong
+          }
+      );
+      this.setState({
+          currentSong: this.state.songs[index+1]
+      });
+     }
+     playPreviousSong = (currentSong)=>{
+        let index = this.state.songs.findIndex(
+            (i)=>{
+              return i == currentSong
+            }
+        );
         this.setState({
-          [key]: this.state[key] + value,
+            currentSong: this.state.songs[index-1]
         });
-      }
+       }
      
       
        playSong = (song)=>{
-        let newSongToPlay = {
-            id : song.id,
-            url : "file://"+song.path,
-            title : song.title,
-            artist : song.author,
-            album : song.album,
-            genre : song.genre
-        }
+       
         this.setState({
-            currentSong : newSongToPlay,
+           
             playingIcon : "pause",
-            songPlayed : "yes"
+            songPlayed : "yes",
+            currentSong : song,
+
         }, ()=>{
-            TrackPlayer.add([this.state.currentSong]).then(function() {
-                console.log("Track Added");
-                TrackPlayer.play();
-            });
+            TrackPlayer.play();
+            TrackPlayer.skip(song.id);
+          
         });
        }
+
+       addTracks = ()=>{
+           TrackPlayer.add(this.state.songs).then(
+            ()=>{
+                console.log("Tracks Added");
+               this.setState({
+                   currentSong : this.state.songs[0]
+               });
+            }
+           );
+       }
      componentDidMount = ()=>{
-        let Songs; 
+           // getting permission of storage
+    request(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE).then(result => {
+        this.setState({
+          storagePermission : result
+        }), ()=>{
+          console.log(this.state.storagePermission);
+        };
+      });
+       
         // loading all the music files presesnt in my phone
         MusicFiles.getAll({
             id : true,
@@ -65,14 +93,29 @@ import ProgressBarAnimated from 'react-native-progress-bar-animated';
           title : true,
           cover : true,
              }).then((tracks) => {
-                Songs = tracks;
-                console.log(Songs);
+                 console.log(tracks);
+                let newSongs = tracks.map(
+                    (track)=>{
+                        return {
+                            id : track.id,
+                            url : "file://"+track.path,
+                            title : track.fileName,
+                            artist : track.author,
+                            album : track.album,
+                            genre : track.genre,
+                            duration : track.duration,
+                            artwork : track.cover
+                        }
+                    }
+                );
                 this.setState({
-                 songs : Songs
-               });
+                    songs : newSongs
+                });
+
+
                TrackPlayer.setupPlayer().then(() => {
                 console.log("Player Setup Completed");
-               
+               this.addTracks();
             });
              }).catch(error => {
              console.log(error)
@@ -92,11 +135,15 @@ import ProgressBarAnimated from 'react-native-progress-bar-animated';
         else{
         return (
             <FlatList data={this.state.songs} renderItem={(song)=>{
+                let album = song.item.album;
+                if(album==null){
+                    album = "No Album ";
+                }
                 let minutes =  Math.floor(song.item.duration / 60000);;
                     let seconds = ((song.item.duration % 60000) / 1000).toFixed(0);
                       return(
                         
-                        <TouchableOpacity onPress={
+                        <TouchableWithoutFeedback onPress={
                             ()=>{
                                 this.playSong(song.item);
                             }
@@ -108,13 +155,13 @@ import ProgressBarAnimated from 'react-native-progress-bar-animated';
                      <Text style={{color:"#b3b3b3", overflow:"hidden"}} numberOfLines={1}>{song.item.title}</Text>
                      </View>
                       <View style={{flexDirection:"row", justifyContent:"space-between", marginTop:10}}>
-                      <Text style={{color:"#737373"}}>{song.item.album}</Text>
+                      <Text style={{color:"#737373", overflow:"hidden", width:"60%"}} numberOfLines={1}>{album}</Text>
                     <View style={{}}>                    
                         <Text style={{color:"#b3b3b3", fontSize:16 , }}>{minutes+":"+seconds}</Text>
                     </View>
                       </View>
                       </View>
-                      </TouchableOpacity>
+                      </TouchableWithoutFeedback>
                       );
             }} />
         )
@@ -124,38 +171,45 @@ import ProgressBarAnimated from 'react-native-progress-bar-animated';
      }
 
     render() {
-        const barWidth = Dimensions.get('screen').width - 50;
-        const progressCustomStyles = {
-          backgroundColor: 'red', 
-          borderRadius: 0,
-          borderColor: 'orange',
-        };
+        
         return (
            <View style={styles.main}>
-             <View style={{height:"75%"}}>
+             <View style={{height:"77%"}}>
              {this.loadSongs()}
              </View>
              <View style={{height:"13%",  flexDirection:"row", borderTopColor:"#737373", borderTopWidth:0.6}}>
-                <View style={{width:"20%",height:"80%", backgroundColor:"white", marginLeft:"5%",marginTop:15}}>
-                    
+                <View style={{width:"20%",height:"80%", marginLeft:"5%",marginTop:15}}>
+                <Image source={{uri:this.state.currentSong.artwork}} style={{width: "100%", height: "100%"}} resizeMode="contain" /> 
                 </View>
                 <View style={{flexDirection:"column",justifyContent:"space-between",padding:10, marginLeft:"5%",marginTop:5, width:"75%"}}>
                     <Text style={{color:"#b3b3b3", overflow:"hidden",fontSize:18, fontFamily:"baskerv", width:"70%"}} numberOfLines={1}>{this.state.currentSong.title}</Text>
-                    <Text style={{color:"#737373"}}>{this.state.currentSong.album}</Text>
+                    <Text style={{color:"#737373", overflow:"hidden", width:"60%"}}  numberOfLines={1}>{ (this.state.currentSong.album==null)?"No Album":this.state.currentSong.album  }</Text>
                     <Text style={{color:"#737373", }}>Duration</Text>
                    
                 </View>
                 
              </View>
-             <View style={{height:"3%", marginTop:0,  justifyContent:"center",alignItems:"center"}}>
+             <View style={{height:"2%", marginTop:5,  justifyContent:"center",alignItems:"center"}}>
            
              </View>
                 
-             <View style={{backgroundColor:"#1affb2", height:"9%", marginTop:0, justifyContent:"center", alignContent:"center"}}>
+             <View style={{backgroundColor:"#18cda6", height:"8%", marginTop:0, justifyContent:"center", alignContent:"center"}}>
                <View style={{ flexDirection:"row", justifyContent:"space-around"}}>
+              
+              
                <FontAwesome5 name="retweet" color="white" size={25} />
-               <FontAwesome name="step-backward" color="white" size={25} />
-                <TouchableOpacity onPress={
+              
+              <TouchableWithoutFeedback onPress={
+                  ()=>{
+                    TrackPlayer.skipToPrevious();
+                   this.playPreviousSong(this.state.currentSong);
+                  }
+              }>
+              <FontAwesome name="step-backward" color="white" size={25} />
+              </TouchableWithoutFeedback>
+              
+               
+                <TouchableWithoutFeedback onPress={
                     ()=>{
                         if(this.state.songPlayed=="yes"){
                             TrackPlayer.pause();
@@ -175,8 +229,15 @@ import ProgressBarAnimated from 'react-native-progress-bar-animated';
                 }
                 >
                     <FontAwesome name={this.state.playingIcon} color="white" size={25}/>
-                </TouchableOpacity>
-                <FontAwesome name="step-forward" color="white" size={25}/>
+                </TouchableWithoutFeedback>
+               <TouchableWithoutFeedback onPress={
+                   ()=>{
+                    TrackPlayer.skipToNext();
+                    this.playNextSong(this.state.currentSong);
+                   }
+               }>
+               <FontAwesome name="step-forward" color="white" size={25}/>
+               </TouchableWithoutFeedback>
                 <Feather name="shuffle" size={25} color="white"/>
                </View>
                 
@@ -197,7 +258,7 @@ const styles = StyleSheet.create({
         paddingTop:3 , 
         borderBottomWidth:0.6,
         justifyContent:"space-between",
-        padding : 20,
+        padding : 10,
         margin:10
         },
 
