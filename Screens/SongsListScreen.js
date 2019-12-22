@@ -6,6 +6,7 @@ import FontAwesome from "react-native-vector-icons/FontAwesome";
 import FontAwesome5 from "react-native-vector-icons/FontAwesome5";
 import Feather from "react-native-vector-icons/Feather";
 import {request, PERMISSIONS} from 'react-native-permissions';
+import * as Progress from 'react-native-progress';
  class SongsListScreen extends Component {
      state = {
          songs : null,
@@ -25,27 +26,6 @@ import {request, PERMISSIONS} from 'react-native-permissions';
 
      }
      
-     playNextSong = (currentSong)=>{
-      let index = this.state.songs.findIndex(
-          (i)=>{
-            return i == currentSong
-          }
-      );
-      this.setState({
-          currentSong: this.state.songs[index+1]
-      });
-     }
-     playPreviousSong = (currentSong)=>{
-        let index = this.state.songs.findIndex(
-            (i)=>{
-              return i == currentSong
-            }
-        );
-        this.setState({
-            currentSong: this.state.songs[index-1]
-        });
-       }
-     
       
        playSong = (song)=>{
        
@@ -63,6 +43,41 @@ import {request, PERMISSIONS} from 'react-native-permissions';
        }
 
        addTracks = ()=>{
+        TrackPlayer.updateOptions({
+            // One of RATING_HEART, RATING_THUMBS_UP_DOWN, RATING_3_STARS, RATING_4_STARS, RATING_5_STARS, RATING_PERCENTAGE
+           
+            // Whether the player should stop running when the app is closed on Android
+            stopWithApp: false,
+        
+            // An array of media controls capabilities
+            // Can contain CAPABILITY_PLAY, CAPABILITY_PAUSE, CAPABILITY_STOP, CAPABILITY_SEEK_TO,
+            // CAPABILITY_SKIP_TO_NEXT, CAPABILITY_SKIP_TO_PREVIOUS, CAPABILITY_SET_RATING
+            capabilities: [
+                TrackPlayer.CAPABILITY_PLAY,
+                TrackPlayer.CAPABILITY_PAUSE,
+                TrackPlayer.CAPABILITY_SKIP_TO_NEXT,
+                TrackPlayer.CAPABILITY_SKIP_TO_PREVIOUS,
+                TrackPlayer.CAPABILITY_STOP,
+            ],
+            
+            // An array of capabilities that will show up when the notification is in the compact form on Android
+            compactCapabilities: [
+                TrackPlayer.CAPABILITY_PLAY,
+                TrackPlayer.CAPABILITY_PAUSE,
+                TrackPlayer.CAPABILITY_SKIP_TO_NEXT,
+                TrackPlayer.CAPABILITY_SKIP_TO_PREVIOUS,
+                TrackPlayer.CAPABILITY_STOP,
+            ],
+            notificationCapabilities : [
+                TrackPlayer.CAPABILITY_PLAY,
+                TrackPlayer.CAPABILITY_PAUSE,
+                TrackPlayer.CAPABILITY_SKIP_TO_NEXT,
+                TrackPlayer.CAPABILITY_SKIP_TO_PREVIOUS,
+                TrackPlayer.CAPABILITY_STOP,
+            ]
+        
+            
+        });
            TrackPlayer.add(this.state.songs).then(
             ()=>{
                 console.log("Tracks Added");
@@ -115,10 +130,22 @@ import {request, PERMISSIONS} from 'react-native-permissions';
 
                TrackPlayer.setupPlayer().then(() => {
                 console.log("Player Setup Completed");
+               
                this.addTracks();
             });
              }).catch(error => {
              console.log(error)
+        });
+       
+        // if the track changed
+        this.onTrackChange = TrackPlayer.addEventListener('playback-track-changed', async (data) => {
+            
+            const track = await TrackPlayer.getTrack(data.nextTrack);
+            this.setState({
+                currentSong : track,
+            });
+           
+            
         });
 
        
@@ -189,8 +216,8 @@ import {request, PERMISSIONS} from 'react-native-permissions';
                 </View>
                 
              </View>
-             <View style={{height:"2%", marginTop:5,  justifyContent:"center",alignItems:"center"}}>
-           
+             <View style={{height:"2%", marginTop:5,   justifyContent:"center",alignItems:"center"}}>
+             <Progress.Bar progress={0.1} borderWidth={0.5} unfilledColor="white" color="#18cda6" borderColor="white" style={{width:"100%", backgroundColor:"ccc"}} width={0} />
              </View>
                 
              <View style={{backgroundColor:"#18cda6", height:"8%", marginTop:0, justifyContent:"center", alignContent:"center"}}>
@@ -202,7 +229,6 @@ import {request, PERMISSIONS} from 'react-native-permissions';
               <TouchableWithoutFeedback onPress={
                   ()=>{
                     TrackPlayer.skipToPrevious();
-                   this.playPreviousSong(this.state.currentSong);
                   }
               }>
               <FontAwesome name="step-backward" color="white" size={25} />
@@ -233,7 +259,6 @@ import {request, PERMISSIONS} from 'react-native-permissions';
                <TouchableWithoutFeedback onPress={
                    ()=>{
                     TrackPlayer.skipToNext();
-                    this.playNextSong(this.state.currentSong);
                    }
                }>
                <FontAwesome name="step-forward" color="white" size={25}/>
