@@ -1,17 +1,19 @@
 import React, { Component } from 'react'
-import {View, Text , StyleSheet, Dimensions, Image , TouchableWithoutFeedback , FlatList} from "react-native";
+import {View, Text , StyleSheet, Modal, Image ,Alert, TouchableWithoutFeedback ,TouchableHighlight, FlatList} from "react-native";
 import TrackPlayer from 'react-native-track-player';
 import MusicFiles from 'react-native-get-music-files';
 import FontAwesome from "react-native-vector-icons/FontAwesome";
 import FontAwesome5 from "react-native-vector-icons/FontAwesome5";
 import Feather from "react-native-vector-icons/Feather";
-import {request, PERMISSIONS} from 'react-native-permissions';
 import * as Progress from 'react-native-progress';
+import SplashScreen from "./SplashScreen";
  class SongsListScreen extends Component {
      state = {
          songs : null,
          songsAdded: [],
-         storagePermission:null,
+         modalVisible: false,
+         repeat : false,
+         repeatIconColor:"white",
          currentSong : {  
             id : 1,
             url : "",
@@ -26,9 +28,9 @@ import * as Progress from 'react-native-progress';
 
      }
      
+   
       
        playSong = (song)=>{
-       
         this.setState({
            
             playingIcon : "pause",
@@ -38,21 +40,16 @@ import * as Progress from 'react-native-progress';
         }, ()=>{
             TrackPlayer.play();
             TrackPlayer.skip(song.id);
-          
+            
         });
        }
 
        addTracks = ()=>{
         TrackPlayer.updateOptions({
-            // One of RATING_HEART, RATING_THUMBS_UP_DOWN, RATING_3_STARS, RATING_4_STARS, RATING_5_STARS, RATING_PERCENTAGE
            
-            // Whether the player should stop running when the app is closed on Android
             stopWithApp: false,
         
-            // An array of media controls capabilities
-            // Can contain CAPABILITY_PLAY, CAPABILITY_PAUSE, CAPABILITY_STOP, CAPABILITY_SEEK_TO,
-            // CAPABILITY_SKIP_TO_NEXT, CAPABILITY_SKIP_TO_PREVIOUS, CAPABILITY_SET_RATING
-            capabilities: [
+               capabilities: [
                 TrackPlayer.CAPABILITY_PLAY,
                 TrackPlayer.CAPABILITY_PAUSE,
                 TrackPlayer.CAPABILITY_SKIP_TO_NEXT,
@@ -74,7 +71,8 @@ import * as Progress from 'react-native-progress';
                 TrackPlayer.CAPABILITY_SKIP_TO_NEXT,
                 TrackPlayer.CAPABILITY_SKIP_TO_PREVIOUS,
                 TrackPlayer.CAPABILITY_STOP,
-            ]
+            ],
+            
         
             
         });
@@ -87,15 +85,14 @@ import * as Progress from 'react-native-progress';
             }
            );
        }
+
+       setModalVisible = (visible)=> {
+        this.setState({modalVisible: visible});
+      }
+
+
      componentDidMount = ()=>{
-           // getting permission of storage
-    request(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE).then(result => {
-        this.setState({
-          storagePermission : result
-        }), ()=>{
-          console.log(this.state.storagePermission);
-        };
-      });
+  
        
         // loading all the music files presesnt in my phone
         MusicFiles.getAll({
@@ -140,23 +137,20 @@ import * as Progress from 'react-native-progress';
         // if the track changed
         this.onTrackChange = TrackPlayer.addEventListener('playback-track-changed', async (data) => {
             
-            const track = await TrackPlayer.getTrack(data.nextTrack);
-            this.setState({
-                currentSong : track,
-            });
-           
             
-        });
-
-       
+                const track = await TrackPlayer.getTrack(data.nextTrack);
+                this.setState({
+                    currentSong : track,
+                });
+                
+            
+        });  
      }
 
      loadSongs = ()=>{
         if(this.state.songs== null){
           return(
-           <View style={{alignItems:"center"}}>
-                <Text style={{color:"white"}}>Loading Songs... Please Wait....</Text>
-           </View>
+          <SplashScreen/>
           )
         }
         else{
@@ -184,7 +178,7 @@ import * as Progress from 'react-native-progress';
                       <View style={{flexDirection:"row", justifyContent:"space-between", marginTop:10}}>
                       <Text style={{color:"#737373", overflow:"hidden", width:"60%"}} numberOfLines={1}>{album}</Text>
                     <View style={{}}>                    
-                        <Text style={{color:"#b3b3b3", fontSize:16 , }}>{minutes+":"+seconds}</Text>
+                    <Text style={{color:"#b3b3b3", fontSize:16 , }}>{minutes+":"+seconds}</Text>
                     </View>
                       </View>
                       </View>
@@ -192,46 +186,73 @@ import * as Progress from 'react-native-progress';
                       );
             }} />
         )
-        }
-       
-         
+        }  
      }
 
     render() {
-        
+        let totalDuration = this.state.currentSong.duration;
+        let minutes =  Math.floor(totalDuration / 60000);;
+        let seconds = ((totalDuration % 60000) / 1000).toFixed(0);
         return (
            <View style={styles.main}>
              <View style={{height:"77%"}}>
              {this.loadSongs()}
              </View>
-             <View style={{height:"13%",  flexDirection:"row", borderTopColor:"#737373", borderTopWidth:0.6}}>
-                <View style={{width:"20%",height:"80%", marginLeft:"5%",marginTop:15}}>
-                <Image source={{uri:this.state.currentSong.artwork}} style={{width: "100%", height: "100%"}} resizeMode="contain" /> 
+              <Modal
+          animationType="slide"
+          transparent={false}
+          visible={this.state.modalVisible}
+          onRequestClose={() => {
+            this.setModalVisible(!this.state.modalVisible);
+          }}>
+          <View style={{flex:1,margin:0}}>
+            <View style={{height:"92%", backgroundColor:"#1C2427",alignItems:"center"}}>
+            <View style={{width:"95%",height:"70%",marginTop:15,alignItems:"center"}}>
+                <Image source={{uri:this.state.currentSong.artwork}} style={{width: "90%", height: "100%"}} resizeMode="contain" /> 
+            </View>
+                <View style={{flexDirection:"column",justifyContent:"space-between",padding:10, alignItems:"center", width:"95%", height:"15%",}}>
+                 
+                 <Text style={{color:"#b3b3b3", overflow:"hidden",fontSize:18, fontFamily:"baskerv", width:"80%", textAlign:"center"}} numberOfLines={1}>{this.state.currentSong.title}</Text>
+                 
+                    <Text style={{color:"#737373", overflow:"hidden", width:"60%",textAlign:"center"}}  numberOfLines={1}>{ (this.state.currentSong.album==null)?"No Album":this.state.currentSong.album  }</Text>
+                    
+                 
                 </View>
-                <View style={{flexDirection:"column",justifyContent:"space-between",padding:10, marginLeft:"5%",marginTop:5, width:"75%"}}>
-                    <Text style={{color:"#b3b3b3", overflow:"hidden",fontSize:18, fontFamily:"baskerv", width:"70%"}} numberOfLines={1}>{this.state.currentSong.title}</Text>
-                    <Text style={{color:"#737373", overflow:"hidden", width:"60%"}}  numberOfLines={1}>{ (this.state.currentSong.album==null)?"No Album":this.state.currentSong.album  }</Text>
-                    <Text style={{color:"#737373", }}>Duration</Text>
-                   
-                </View>
-                
-             </View>
-             <View style={{height:"2%", marginTop:5,   justifyContent:"center",alignItems:"center"}}>
-             <Progress.Bar progress={0.1} borderWidth={0.5} unfilledColor="white" color="#18cda6" borderColor="white" style={{width:"100%", backgroundColor:"ccc"}} width={0} />
-             </View>
-                
-             <View style={{backgroundColor:"#18cda6", height:"8%", marginTop:0, justifyContent:"center", alignContent:"center"}}>
+            </View>
+  
+            <View style={{backgroundColor:"#18cda6", height:"8%", marginTop:0, justifyContent:"center", alignContent:"center"}}>
                <View style={{ flexDirection:"row", justifyContent:"space-around"}}>
               
-              
-               <FontAwesome5 name="retweet" color="white" size={25} />
-              
+              <TouchableWithoutFeedback onPress={
+                  ()=>{
+                    if(this.state.repeat){
+                        this.setState({
+                            repeat:!this.state.repeat,
+                            repeatIconColor : "white"
+                        });
+                     } 
+                     else{
+                        this.setState({
+                            repeat:!this.state.repeat,
+                            repeatIconColor : "#ff9999"
+                        });
+                     }
+                  }
+              }>
+
+              <View style={{ width:"15%", alignItems:"center"}}>
+               <FontAwesome5 name="retweet" color={this.state.repeatIconColor} size={25} />
+               </View>
+               </TouchableWithoutFeedback>
               <TouchableWithoutFeedback onPress={
                   ()=>{
                     TrackPlayer.skipToPrevious();
                   }
               }>
-              <FontAwesome name="step-backward" color="white" size={25} />
+                <View style={{ width:"15%", alignItems:"center"}}>
+                <FontAwesome name="step-backward" color="white" size={25} />
+                </View>
+             
               </TouchableWithoutFeedback>
               
                
@@ -254,16 +275,123 @@ import * as Progress from 'react-native-progress';
                     }
                 }
                 >
+                     <View style={{ width:"15%", alignItems:"center"}}>
                     <FontAwesome name={this.state.playingIcon} color="white" size={25}/>
+                    </View>
                 </TouchableWithoutFeedback>
                <TouchableWithoutFeedback onPress={
                    ()=>{
                     TrackPlayer.skipToNext();
                    }
                }>
+                    <View style={{ width:"15%", alignItems:"center"}}>
                <FontAwesome name="step-forward" color="white" size={25}/>
+               </View>
                </TouchableWithoutFeedback>
+               <TouchableWithoutFeedback>
+                     <View style={{ width:"15%", alignItems:"center"}}>
                 <Feather name="shuffle" size={25} color="white"/>
+                </View>
+                </TouchableWithoutFeedback>
+               </View>
+                
+             </View> 
+          </View>
+        </Modal>
+
+            <TouchableWithoutFeedback onPress={() => {
+                  this.setModalVisible(!this.state.modalVisible);
+                }}>
+            <View style={{height:"16%",  flexDirection:"row", borderTopColor:"#737373", borderTopWidth:0.6}}>
+                <View style={{width:"20%",height:"80%", marginLeft:"5%",marginTop:15}}>
+                <Image source={{uri:this.state.currentSong.artwork}} style={{width: "100%", height: "100%"}} resizeMode="contain" /> 
+                </View>
+                <View style={{flexDirection:"column",justifyContent:"space-between",padding:10, marginLeft:"5%",marginTop:5, width:"75%"}}>
+                    <Text style={{color:"#b3b3b3", overflow:"hidden",fontSize:18, fontFamily:"baskerv", width:"70%"}} numberOfLines={1}>{this.state.currentSong.title}</Text>
+                    <Text style={{color:"#737373", overflow:"hidden", width:"60%"}}  numberOfLines={1}>{ (this.state.currentSong.album==null)?"No Album":this.state.currentSong.album  }</Text>
+                <Text style={{color:"#737373", }}>{this.state.increasePlayDuration}/{minutes+":"+seconds}</Text>
+                   
+                </View>
+                
+             </View>
+
+
+            </TouchableWithoutFeedback>
+            
+                
+             <View style={{backgroundColor:"#18cda6", height:"8%", marginTop:0, justifyContent:"center", alignContent:"center"}}>
+               <View style={{ flexDirection:"row", justifyContent:"space-around"}}>
+              
+              <TouchableWithoutFeedback  onPress={
+                  ()=>{
+                     if(this.state.repeat){
+                        this.setState({
+                            repeat:!this.state.repeat,
+                            repeatIconColor : "white"
+                        });
+                     } 
+                     else{
+                        this.setState({
+                            repeat:!this.state.repeat,
+                            repeatIconColor : "#ff9999"
+                        });
+                     }
+                  }
+              }>
+
+              <View style={{ width:"15%", alignItems:"center"}}>
+               <FontAwesome5 name="retweet" color={this.state.repeatIconColor} size={25} />
+               </View>
+               </TouchableWithoutFeedback>
+              <TouchableWithoutFeedback onPress={
+                  ()=>{
+                    TrackPlayer.skipToPrevious();
+                  }
+              }>
+                <View style={{ width:"15%", alignItems:"center"}}>
+                <FontAwesome name="step-backward" color="white" size={25} />
+                </View>
+             
+              </TouchableWithoutFeedback>
+              
+               
+                <TouchableWithoutFeedback onPress={
+                    ()=>{
+                        if(this.state.songPlayed=="yes"){
+                            TrackPlayer.pause();
+                            this.setState({
+                                songPlayed : "no",
+                                playingIcon : "play",
+                            });
+                        }
+                        else{
+                         TrackPlayer.play();
+                         this.setState({
+                             songPlayed : "yes",
+                             playingIcon : "pause",
+                         });
+                        } 
+                    }
+                }
+                >
+                     <View style={{ width:"15%", alignItems:"center"}}>
+                    <FontAwesome name={this.state.playingIcon} color="white" size={25}/>
+                    </View>
+                </TouchableWithoutFeedback>
+               <TouchableWithoutFeedback onPress={
+                   ()=>{
+                    TrackPlayer.skipToNext();
+                   }
+               }>
+                    <View style={{ width:"15%", alignItems:"center"}}>
+               <FontAwesome name="step-forward" color="white" size={25}/>
+               </View>
+               </TouchableWithoutFeedback>
+               <TouchableWithoutFeedback>
+                     <View style={{ width:"15%", alignItems:"center"}}>
+                <Feather name="shuffle" size={25} color="white"/>
+                </View>
+                </TouchableWithoutFeedback>
                </View>
                 
              </View> 
